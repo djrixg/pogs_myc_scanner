@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Scanner</title>
+	<script src="html5-qrcode.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="bootstrap.min.css">
+	<script src="jquery.js"></script>
+	<script src="qrcode.min.js"></script>
+	<script src="jquery.cookie.js"></script>
+	<script src="crypto-js.min.js"></script>
+</head>
+<body class="container" style="padding-top: 50px;">
+	<div class="col-md-4 col-sm-12">
+		<div width="100%" id="reader"></div>
+	</div>
+	<div class="col-md-6 col-sm-12">
+		<button id="download-button" class="btn btn-success">Download CSV</button>
+		<button onclick="clear_data()" class="btn btn-secondary">Clear Table</button>
+		<button onclick="update_key()" class="btn btn-outline-secondary">Update Encryption Key</button>
+		<table class="table table-striped">
+		  <thead>
+		    <tr>
+		      <th scope="col">#</th>
+		      <th scope="col">Name</th>
+		      <th scope="col">Email</th>
+		      <th scope="col">Contact</th>
+		      <th scope="col">Region</th>
+		      <th scope="col">Remarks</th>
+		    </tr>
+		  </thead>
+		  <tbody id="content">
+		  </tbody>
+		</table>
+	</div>
+<script type="text/javascript">
+	// $("#reader__dashboard_section_swaplink").addClass("hidden");
+	function clear_data(){
+		if(prompt("Type \"confirm\" to clear the data.")=="confirm"){
+			$.removeCookie('attendance');
+			location.reload();
+		}
+	}
+	var attendance = [];
+	counter = 0;
+	if(typeof $.cookie('encryption_key') === 'undefined'){
+		update_key();
+	}
+	function update_key(){
+		encryption_key = prompt("Please enter key:", "");
+		if(encryption_key!=null){
+			$.cookie('encryption_key', encryption_key, { expires: 365 });
+		}
+		console.log(encryption_key);
+	}
+	function hexToString(hex) {
+		key=$.cookie('encryption_key');
+	  let result = "";
+	  for (let i = 0; i < hex.length; i += 2) {
+	    const hexChar = hex.substring(i, i + 2);
+	    const encryptedChar = parseInt(hexChar, 16);
+	    const keyChar = key.charCodeAt((i / 2) % key.length);
+	    const decryptedChar = encryptedChar ^ keyChar; // XOR operation
+	    result += String.fromCharCode(decryptedChar);
+	  }
+	  return result;
+	}
+	function add_to_List(c,person){
+		$("#content").append(`<tr>
+			<td>`+c+`</td>
+			<td>`+person[0]+`</td>
+			<td>`+person[1]+`</td>
+			<td>`+person[2]+`</td>
+			<td>`+person[3]+`</td>
+			<td><button class="btn btn-outline-primary" id="remarks_`+String(c-1)+`" onclick="add_remarks(`+String(c-1)+`)">Add Remarks</button></td>
+		</tr>`);
+		if(typeof person[4] !== 'undefined'){$("#remarks_"+String(c-1)).html(person[4]);}
+	}
+	function add_remarks(id){
+		temp_text = "";
+		if($("#remarks_"+String(id)).html()!="Add Remarks")temp_text = $("#remarks_"+String(id)).html();
+		 remarks = window.prompt('Enter Remarks:',temp_text).replace(/[^\w\s]/gi, "");
+		 if(remarks!=""){
+		 	if(attendance[id].split(",").length==4){
+ 	 			attendance[id] = attendance[id].replace(`]`,`,"`+remarks+`"]`);
+ 	 		}else{
+ 	 			temp = attendance[id].split(",");
+ 	 			temp[4] = '"'+remarks+'"';
+ 	 			text="";
+ 	 			for (var i = 0; i < temp.length; i++) {
+ 	 				text+=String(temp[i]);
+ 	 				if(i<4)text+=",";
+ 	 			}
+ 	 			text+="]";
+ 	 			attendance[id] = text;
+ 	 		}
+ 	 		console.log(attendance);
+	 		$("#remarks_"+String(id)).text(remarks);
+	 		$.cookie('attendance', JSON.stringify(attendance), { expires: 365 });
+	 	}
+	}
+	if(typeof $.cookie('attendance') === 'undefined'){
+		$.cookie('attendance', JSON.stringify(attendance), { expires: 365 });
+	}else{
+		input = $.cookie('attendance');
+		persons = JSON.parse(input);
+		temp_c = 1;
+		persons.forEach(function(person) {
+		  console.log(person);
+		  person = JSON.parse(person);
+			add_to_List(temp_c,person);
+			temp_c++;
+		});
+	}
+	attendance = jQuery.parseJSON($.cookie('attendance'));
+	function isTempInAttendance(temp) {
+		console.log("Checking...");
+		ttt = "98765432123456789";
+	  attendance.forEach(function(element, index) {
+		  if(temp.split(",")[0] == element.split(",")[0]){
+		  	ttt=index;
+		  }
+		});
+	  console.log(ttt);
+	  return ttt;
+	}
+	function onScanSuccess(decodedText, decodedResult) {
+		temp = hexToString(decodedResult["decodedText"]);
+		if(temp.includes("secret")){
+			content = temp.replace("secret","");
+			person = content.replace('["', "").replace('"]', "").split('","');
+			id = isTempInAttendance(content);
+			// console.log(id);
+			if(id == "98765432123456789"){
+	    	    attendance.push(content);
+	    	    // console.log(attendance);
+				$.cookie('attendance', JSON.stringify(attendance), { expires: 365 });
+				counter++;
+				add_to_List(counter,person);
+				alert(person[0]+" added!");
+	    	}else{
+	    		// alert("You're already scanned!");
+	    		add_remarks(id);
+	    	}
+	    }else{
+	    	alert("Wrong Decryption Key");
+	    }
+	}
+
+	function onScanError(errorMessage) {
+	    // handle on error condition, with error message
+	}
+
+	let html5QrcodeScanner = new Html5QrcodeScanner(
+  "reader",
+  { fps: 10, qrbox: {width: 250, height: 250} },
+  /* verbose= */ false);
+	html5QrcodeScanner.render(onScanSuccess, onScanError);
+
+
+function htmlToCSV(html, filename) {
+    var data = [];
+    var rows = document.querySelectorAll("table tr");
+    for (var i = 0; i < rows.length; i++) {
+        var row = [],
+            cols = rows[i].querySelectorAll("td, th");
+
+        for (var j = 0; j < cols.length; j++) {
+            var cellValue = cols[j].innerText;
+            if (cellValue.includes(",")) {
+                cellValue = '"' + cellValue + '"';
+            }
+            row.push(cellValue);
+        }
+        data.push(row.join(","));
+    }
+    downloadCSVFile(data.join("\n"), filename);
+}
+function downloadCSVFile(csv, filename) {
+    var csv_data_uri, download_link;
+    csv_data_uri = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+    download_link = document.createElement("a");
+    download_link.download = filename;
+    download_link.href = csv_data_uri;
+    download_link.style.display = "none";
+    document.body.appendChild(download_link);
+    download_link.click();
+}
+
+document.getElementById("download-button").addEventListener("click", function () {
+    var html = document.querySelector("table").outerHTML;
+    // input = window.prompt('Enter Filename:');
+    var currentDate = new Date();
+
+	var month = ("0" + (currentDate.getMonth() + 1)).slice(-2); // Adding 1 to get the correct month
+	var day = ("0" + currentDate.getDate()).slice(-2);
+	var year = currentDate.getFullYear().toString().substr(-2);
+	var hour = ("0" + currentDate.getHours()).slice(-2);
+	var minutes = ("0" + currentDate.getMinutes()).slice(-2);
+
+	var formattedDate = month + day + year + hour + minutes;
+    // if(input!=null){
+        htmlToCSV(html, "POGSMYC_"+formattedDate + ".csv");
+    // }
+});
+
+	//Optional if gusto mag stop after scanning
+	// var html5QrcodeScanner = new Html5QrcodeScanner(
+ //    "reader", { fps: 10, qrbox: 250 });
+        
+	// function onScanSuccess(decodedText, decodedResult) {
+	//     // Handle on success condition with the decoded text or result.
+	//     console.log(`Scan result: ${decodedText}`, decodedResult);
+	//     // ...
+	//     html5QrcodeScanner.clear();
+	//     // ^ this will stop the scanner (video feed) and clear the scan area.
+	// }
+
+	// html5QrcodeScanner.render(onScanSuccess);
+</script>
+</body>
+</html>
