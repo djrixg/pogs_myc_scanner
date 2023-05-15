@@ -41,6 +41,9 @@
 			location.reload();
 		}
 	}
+	function removeSpecialChars(str) {
+	  return str.replace(/[^\w\s-]/g, '');
+	}
 	var attendance = [];
 	counter = 0;
 	if(typeof $.cookie('encryption_key') === 'undefined'){
@@ -51,7 +54,7 @@
 		if(encryption_key!=null){
 			$.cookie('encryption_key', encryption_key, { expires: 365 });
 		}
-		console.log(encryption_key);
+		// console.log(encryption_key);
 	}
 	function hexToString(hex) {
 		key=$.cookie('encryption_key');
@@ -68,7 +71,7 @@
 	function add_to_List(c,person){
 		$("#content").append(`<tr>
 			<td>`+c+`</td>
-			<td>`+person[0]+`</td>
+			<td>`+person[0].replace("62649871320465098",",")+`</td>
 			<td>`+person[1]+`</td>
 			<td>`+person[2]+`</td>
 			<td>`+person[3]+`</td>
@@ -94,7 +97,7 @@
  	 			text+="]";
  	 			attendance[id] = text;
  	 		}
- 	 		console.log(attendance);
+ 	 		// console.log(attendance);
 	 		$("#remarks_"+String(id)).text(remarks);
 	 		$.cookie('attendance', JSON.stringify(attendance), { expires: 365 });
 	 	}
@@ -106,7 +109,7 @@
 		persons = JSON.parse(input);
 		temp_c = 1;
 		persons.forEach(function(person) {
-		  console.log(person);
+		  // console.log(person);
 		  person = JSON.parse(person);
 			add_to_List(temp_c,person);
 			temp_c++;
@@ -121,22 +124,34 @@
 		  	ttt=index;
 		  }
 		});
-	  console.log(ttt);
+	  // console.log(ttt);
 	  return ttt;
 	}
 	function onScanSuccess(decodedText, decodedResult) {
 		temp = hexToString(decodedResult["decodedText"]);
 		if(temp.includes("secret")){
-			content = temp.replace("secret","");
-			person = content.replace('["', "").replace('"]', "").split('","');
-			id = isTempInAttendance(content);
+			temp = temp.replace("secret","");
+			if(temp.split('"')[1].includes(",")){
+				temp = temp.split('"');
+				ttt = "";
+				for (var i = 0; i < temp.length; i++) {
+					if(i==1){ttt+='"';temp[i]=temp[i].replace(",","")}
+					ttt+=temp[i];
+					if(i==1){ttt+='"';}
+					if(i>1&&i<temp.length-1){ttt+='"';}
+				}
+				temp = ttt;
+			}
+			person = temp.replace('["', "").replace('"]', "").split('","');
+			id = isTempInAttendance(temp);
 			// console.log(id);
 			if(id == "98765432123456789"){
-	    	    attendance.push(content);
+	    	    attendance.push(temp);
 	    	    // console.log(attendance);
 				$.cookie('attendance', JSON.stringify(attendance), { expires: 365 });
 				counter++;
 				add_to_List(counter,person);
+				// console.log(person);
 				alert(person[0]+" added!");
 	    	}else{
 	    		// alert("You're already scanned!");
